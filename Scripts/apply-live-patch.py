@@ -29,3 +29,19 @@ for marker,addition in [
     s=s.replace(marker,addition,1)
 project.write_text(s)
 print("Live tab and project file patched")
+
+# The upstream loudness tap uses iOS 27 / macOS 27 APIs unavailable in
+# Xcode 26.2. Disable only this optional normalization tap on iOS builds.
+audio=Path("Vendor/BiliKitCore/Sources/BiliPlayback/Audio/LoudnessProcessingTap.swift")
+s=audio.read_text()
+needle="        let status = MTAudioProcessingTapCreateWithPreferredFormat("
+if needle not in s: raise SystemExit("Upstream audio API call changed")
+s=s.replace(needle, "        #if os(iOS)\n        retainedState.release()\n        return nil\n        #else\n"+needle,1)
+needle="        return LoudnessProcessingTap(state: state, tap: createdTap)"
+if needle not in s: raise SystemExit("Upstream tap return changed")
+s=s.replace(needle,needle+"\n        #endif",1)
+needle="        parameters.trackID = AVAudioMixInputParametersTrackID.mixID.rawValue"
+if needle not in s: raise SystemExit("Upstream trackID call changed")
+s=s.replace(needle,"        #if !os(iOS)\n"+needle+"\n        #endif",1)
+audio.write_text(s)
+print("Disabled unavailable iOS 27 loudness APIs on iOS 26 SDK")
