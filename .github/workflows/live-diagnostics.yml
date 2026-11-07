@@ -1,0 +1,84 @@
+name: Verify public live search and playback
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/live-diagnostics.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - name: Inspect public responses without account credentials
+        run: |
+          python3 - <<'PY'
+          import json, hashlib, time
+          from urllib.request import Request, urlopen
+          from urllib.parse import urlencode, urlparse
+          from concurrent.futures import ThreadPoolExecutor
+          HEADERS = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://live.bilibili.com/', 'Accept': 'application/json'}
+          def fetch(url, limit=2 * 1024 * 1024):
+              try:
+                  with urlopen(Request(url, headers=HEADERS), timeout=12) as r:
+                      body = r.read(limit)
+                      return r.status, body, r.headers.get('Content-Type', '')
+              except Exception as e:
+                  return getattr(e, 'code', 0), b'', type(e).__name__
+          def api(host, path, params=None):
+              status, body, mime = fetch('https://' + host + path + ('?' + urlencode(params) if params else ''))
+              try: root = json.loads(body)
+              except Exception: root = {}
+              return status, root, mime
+          def emit(name, **data):
+              print(json.dumps({'check': name, **data}, ensure_ascii=False), flush=True)
+          status, nav, _ = api('api.bilibili.com', '/x/web-interface/nav')
+          wbi = (nav.get('data') or {}).get('wbi_img', {})
+          emit('anonymous-nav', http=status, code=nav.get('code'), has_wbi=bool(wbi))
+          params = {'search_type': 'live_room', 'keyword': 'advent', 'page': '1'}
+          for signed in (False, True):
+              query = dict(params)
+              if signed:
+                  if not wbi: continue
+                  source = urlparse(wbi['img_url']).path.split('/')[-1].split('.')[0] + urlparse(wbi['sub_url']).path.split('/')[-1].split('.')[0]
+                  table = [46,47,18,2,53,8,23,32,15,50,10,31,58,3,45,35,27,43,5,49,33,9,42,19,29,28,14,39,12,38,41,13,37,48,7,16,24,55,40,61,26,17,0,1,60,51,30,4,22,25,54,21,56,59,6,63,57,62,11,36,20,34,44,52]
+                  key = ''.join(source[i] for i in table)[:32]
+                  query['wts'] = str(int(time.time()))
+                  encoded = urlencode(sorted(query.items()), safe='-._~')
+                  query['w_rid'] = hashlib.md5((encoded + key).encode()).hexdigest()
+              path = '/x/web-interface/wbi/search/type' if signed else '/x/web-interface/search/type'
+              status, root, _ = api('api.bilibili.com', path, query)
+              rows = (root.get('data') or {}).get('result') or []
+              emit('signed-search' if signed else 'legacy-search', http=status, code=root.get('code'), count=len(rows), rooms=[{'id':r.get('roomid'),'name':r.get('uname')} for r in rows[:3]])
+          status, root, _ = api('api.live.bilibili.com', '/xlive/web-interface/v1/webMain/getMoreRecList', {'platform':'web','page':1})
+          rows = (root.get('data') or {}).get('recommend_room_list') or []
+          emit('recommendations', http=status, code=root.get('code'), count=len(rows))
+          def inspect(room):
+              roomid = room['roomid']
+              status, legacy, _ = api('api.live.bilibili.com', '/room/v1/Room/playUrl', {'cid':roomid,'platform':'h5','quality':10000})
+              entries = (legacy.get('data') or {}).get('durl') or []
+              old = []
+              for entry in entries[:2]:
+                  url = entry.get('url','')
+                  manifest_status, body, mime = fetch(url, 64 * 1024)
+                  old.append({'extension':urlparse(url).path.rsplit('.',1)[-1], 'http':manifest_status,'mime':mime,'hls':body.startswith(b'#EXTM3U'),'flv':body.startswith(b'FLV')})
+              emit('legacy-playback', room=roomid, http=status, code=legacy.get('code'), sources=old)
+              status, modern, _ = api('api.live.bilibili.com', '/xlive/web-room/v2/index/getRoomPlayInfo', {'room_id':roomid,'protocol':'1','format':'1,2','codec':'0','qn':'400','platform':'h5','ptype':'8'})
+              data = modern.get('data') or {}
+              streams = ((data.get('playurl_info') or {}).get('playurl') or {}).get('stream') or []
+              details=[]
+              for stream in streams:
+                  for fmt in stream.get('format',[]):
+                      for codec in fmt.get('codec',[]):
+                          urls=codec.get('url_info') or []
+                          result={'protocol':stream.get('protocol_name'),'format':fmt.get('format_name'),'codec':codec.get('codec_name'),'cdn_count':len(urls)}
+                          if urls:
+                              url=urls[0]['host']+codec['base_url']+urls[0].get('extra','')
+                              manifest_status, body, mime=fetch(url)
+                              result.update({'http':manifest_status,'mime':mime,'hls':body.startswith(b'#EXTM3U')})
+                          details.append(result)
+              emit('hls-avc-playback',room=roomid,http=status,code=modern.get('code'),live_status=data.get('live_status'),sources=details)
+          with ThreadPoolExecutor(max_workers=3) as pool:
+              list(pool.map(inspect,rows[:3]))
+          PY
