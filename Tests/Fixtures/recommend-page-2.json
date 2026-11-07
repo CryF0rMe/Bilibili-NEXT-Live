@@ -1,0 +1,128 @@
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "recommend_room_list": [
+      {
+        "area_v2_name": "吃鸡行动",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/user_cover/9b62840b75c9efaf027396cec1d7a206d6f239b4.jpg",
+        "online": 96619,
+        "roomid": 22957791,
+        "title": "带完舰长然后单人四排",
+        "uname": "意识DT",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021000022957791c0r3yw.jpg"
+      },
+      {
+        "area_v2_name": "点唱",
+        "area_v2_parent_name": "聊天室",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/288c53ec288e83e4f704129dcc145f0eb4048da5.jpg",
+        "online": 109033,
+        "roomid": 25355395,
+        "title": "用旋律点燃热爱用歌声对抗平庸",
+        "uname": "女明星全麦优质点唱",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe110800180000253553953c72hn.jpg"
+      },
+      {
+        "area_v2_name": "英雄联盟",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/527c7a9ce3a6d8978887c4a64b6538d7f7da6f6c.jpg",
+        "online": 142794,
+        "roomid": 25820260,
+        "title": "海斗！谁是世界第一武器？",
+        "uname": "不死斩剑圣",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe110800170000258202607fbx2s.jpg"
+      },
+      {
+        "area_v2_name": "卡牌周边",
+        "area_v2_parent_name": "购物",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/332ecb149c3b1e250b7464c12f57171d666dc147.jpg",
+        "online": 5905,
+        "roomid": 21661347,
+        "title": "拆卡！-xxxHOLiC- 初音未来！飞花令~明日方舟",
+        "uname": "陶鸟鸟呀",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080020000021661347rpmaxc.jpg"
+      },
+      {
+        "area_v2_name": "购物",
+        "area_v2_parent_name": "购物",
+        "cover": "https://i0.hdslb.com/bfs/live/user_cover/4d004190cccd8b7beb038f821190d9811d76e9ad.jpg",
+        "online": 1623,
+        "roomid": 1838249402,
+        "title": "新人首单M6原盒原膜499",
+        "uname": "PTCG鸭哥",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080020001838249402x9kry1.jpg"
+      },
+      {
+        "area_v2_name": "生活杂谈",
+        "area_v2_parent_name": "生活",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/2ea59a2fe6f151adc72c599b436d83c58187d9a7.jpg",
+        "online": 37063,
+        "roomid": 5085533,
+        "title": "来吧继续嘲笑哈哈哈~ 伊朗赢学大师 上课",
+        "uname": "AJ小外",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080016000005085533k58037.jpg"
+      },
+      {
+        "area_v2_name": "历史·人文·综合",
+        "area_v2_parent_name": "知识",
+        "cover": "https://i0.hdslb.com/bfs/live/cover_edit/bbddd9e780318055f4013d3f6c7e36a1458d3a75.jpg",
+        "online": 13336,
+        "roomid": 24345250,
+        "title": "播",
+        "uname": "青落同学",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe110800170000243452509e3hfe.jpg"
+      },
+      {
+        "area_v2_name": "自习室",
+        "area_v2_parent_name": "知识",
+        "cover": "https://i0.hdslb.com/bfs/live/user_cover/b0f4a08e8a9fe664a62cfcf59bab1ca9294e8cd0.jpg",
+        "online": 4194,
+        "roomid": 12618111,
+        "title": "卷王一路硕博！！！",
+        "uname": "星伊云同桌自习室",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021000012618111ou3cmy.jpg"
+      },
+      {
+        "area_v2_name": "逃离塔科夫",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/cover_edit/940ff3985d9667b9f0898d3c4241bb080bd258a9.jpg",
+        "online": 67259,
+        "roomid": 30013108,
+        "title": "仓库扩容12点最后一次补货！",
+        "uname": "油墨香车",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe110800210000300131084ia50v.jpg"
+      },
+      {
+        "area_v2_name": "运动体育",
+        "area_v2_parent_name": "生活",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/814f7e85ffcb2d8b5aebf9751b2099dce5004a74.jpg",
+        "online": 15228,
+        "roomid": 23964528,
+        "title": "全网最懂尤文也是最懂球的苏教练",
+        "uname": "尤文图斯非官方",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe1108002100002396452801z3ep.jpg"
+      },
+      {
+        "area_v2_name": "主机游戏",
+        "area_v2_parent_name": "单机游戏",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/56d4881e3e52f786a1c691f106c9794d1027d251.jpg",
+        "online": 278441,
+        "roomid": 440006,
+        "title": "先深空当铺 明天再史上最强",
+        "uname": "高寒时薪十块",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080017000000440006qgg3or.jpg"
+      },
+      {
+        "area_v2_name": "颜值",
+        "area_v2_parent_name": "娱乐",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/7d2dbd5cf4960b64c3880939837d83a04fa3c0e2.jpg",
+        "online": 123849,
+        "roomid": 1819686881,
+        "title": "打Ai试试看？",
+        "uname": "别烦小梦_",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021001819686881ga91ab.jpg"
+      }
+    ]
+  }
+}

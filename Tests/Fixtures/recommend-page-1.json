@@ -1,0 +1,128 @@
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "recommend_room_list": [
+      {
+        "area_v2_name": "QQ飞车",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/c549d8ff15bbb2561e2ff8924d07a9ae9c8466f8.jpg",
+        "online": 7548,
+        "roomid": 3182251,
+        "title": "一休大叔真好玩（老街集市版）！",
+        "uname": "一休大叔真好玩",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe110800210000031822511zt2rc.jpg"
+      },
+      {
+        "area_v2_name": "三角洲行动",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/09dc643698236fb686e4fd60fd7ecfbeef644990.jpg",
+        "online": 6395,
+        "roomid": 1879852526,
+        "title": "烽火职业联赛春夏双FMVP给航天点教训",
+        "uname": "滔搏-white",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe110800170018798525260t518n.jpg"
+      },
+      {
+        "area_v2_name": "团播",
+        "area_v2_parent_name": "娱乐",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/31023620a277378b25e5936b6db031cf30e83d08.jpg",
+        "online": 142147,
+        "roomid": 1838246434,
+        "title": "挑战全网刀门",
+        "uname": "天际线-101",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080022001838246434jj5e9a.jpg"
+      },
+      {
+        "area_v2_name": "虚拟日常",
+        "area_v2_parent_name": "虚拟主播",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/cff4399625eacc1c7c1df8c1619c57489ed6e758.jpg",
+        "online": 170815,
+        "roomid": 10984778,
+        "title": "今晚被窝回",
+        "uname": "桃桃栀Momochi",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021000010984778y7sd2r.jpg"
+      },
+      {
+        "area_v2_name": "自习室",
+        "area_v2_parent_name": "知识",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/c2d6718a2420b68746cd2fcf195ca9ad127488cd.jpg",
+        "online": 2317,
+        "roomid": 27099598,
+        "title": "电子安眠药，深夜集合点懒大王雨声白噪音宠",
+        "uname": "懒大王助眠",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021000027099598m8oadg.jpg"
+      },
+      {
+        "area_v2_name": "魔兽世界",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/e3b91b499624d1ab463e278e1c22c072b0a6508b.jpg",
+        "online": 41935,
+        "roomid": 5096,
+        "title": "魔兽糕手",
+        "uname": "两仪滚",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080017000000005096nrmdi5.jpg"
+      },
+      {
+        "area_v2_name": "主机游戏",
+        "area_v2_parent_name": "单机游戏",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/9c3fb108ead135b8c9dbf08753d4b13f2436ee10.jpg",
+        "online": 72094,
+        "roomid": 452138,
+        "title": "师兄带我吃饭⭐",
+        "uname": "丝茉茉i",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080020000000452138sbo65j.jpg"
+      },
+      {
+        "area_v2_name": "虚拟日常",
+        "area_v2_parent_name": "虚拟主播",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/061f67f6bc55d03bc988d4423b88797475b8911f.jpg",
+        "online": 55927,
+        "roomid": 21724277,
+        "title": "看赛博花子 积电子德性",
+        "uname": "植物椿",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080020000021724277sh7l5t.jpg"
+      },
+      {
+        "area_v2_name": "户外",
+        "area_v2_parent_name": "生活",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/7b26b06ff866704dbbbe585f180d82e964a78be0.jpg",
+        "online": 606297,
+        "roomid": 21669525,
+        "title": "影之刃零",
+        "uname": "雨说体育徐静雨",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080018000021669525kr127h.jpg"
+      },
+      {
+        "area_v2_name": "恐怖游戏",
+        "area_v2_parent_name": "单机游戏",
+        "cover": "https://i0.hdslb.com/bfs/live/user_cover/5c93a00ccc9694e0f127162fd15bf91f78f25f76.jpg",
+        "online": 62838,
+        "roomid": 3580061,
+        "title": "害怕就抱紧我的黑棉裤大腿",
+        "uname": "你是Nana的小可爱吗",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021000003580061cnow4f.jpg"
+      },
+      {
+        "area_v2_name": "以撒",
+        "area_v2_parent_name": "单机游戏",
+        "cover": "https://i0.hdslb.com/bfs/live/new_room_cover/7ae4bcffd9e9fb14d7405cf92a1713e34f2f662c.jpg",
+        "online": 152445,
+        "roomid": 12265,
+        "title": "进来当以撒高手",
+        "uname": "陈哥1",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe1108001800000001226566hc7k.jpg"
+      },
+      {
+        "area_v2_name": "吃鸡行动",
+        "area_v2_parent_name": "网游",
+        "cover": "https://i0.hdslb.com/bfs/live/user_cover/9b62840b75c9efaf027396cec1d7a206d6f239b4.jpg",
+        "online": 96619,
+        "roomid": 22957791,
+        "title": "带完舰长然后单人四排",
+        "uname": "意识DT",
+        "keyframe": "https://i0.hdslb.com/bfs/live-key-frame/keyframe11080021000022957791c0r3yw.jpg"
+      }
+    ]
+  }
+}

@@ -6,6 +6,7 @@ on:
     paths:
       - 'Apps/iOS/**'
       - 'Scripts/**'
+      - 'Tests/**'
       - '.github/workflows/ios-live-unsigned.yml'
 jobs:
   build:
@@ -27,16 +28,26 @@ jobs:
           git -C upstream fetch --depth 1 origin 67bcc018d408e91b8427f2a7e667ddbd0f2ab011
           git -C upstream checkout --detach FETCH_HEAD
           git -C upstream log -1 --format='Upstream revision: %H %s'
-          cp Apps/iOS/Sources/MobileLive.swift /tmp/MobileLive.swift
+          mkdir -p "$RUNNER_TEMP/live-source"
+          cp Apps/iOS/Sources/MobileLive*.swift "$RUNNER_TEMP/live-source/"
           cp -R upstream/Apps .
           cp -R upstream/Sources .
           cp -R upstream/Vendor .
           cp -R upstream/Assets .
           cp upstream/CHANGELOG.md .
           cp -R upstream/Package.swift .
-          cp /tmp/MobileLive.swift Apps/iOS/Sources/MobileLive.swift
+          cp "$RUNNER_TEMP/live-source/"*.swift Apps/iOS/Sources/
           python3 Scripts/apply-live-patch.py
           test -f Apps/iOS/BilibiliNEXT.xcodeproj/project.pbxproj
+      - name: Validate live discovery and pagination
+        timeout-minutes: 3
+        run: |
+          swiftc -swift-version 6 -parse-as-library \
+            Apps/iOS/Sources/MobileLiveAPI.swift \
+            Apps/iOS/Sources/MobileLiveModel.swift \
+            Tests/LiveContractTests.swift \
+            -o "$RUNNER_TEMP/live-contract-tests"
+          "$RUNNER_TEMP/live-contract-tests" "$GITHUB_WORKSPACE/Tests/Fixtures"
       - name: Build unsigned iOS app
         run: |
           set -o pipefail

@@ -83,7 +83,7 @@ diff --git a/Apps/iOS/Sources/MobileBrowse.swift b/Apps/iOS/Sources/MobileBrowse
 +  // Resolve the concrete array before entering the TabContentBuilder.
 +  private var phoneTabIDs: [Int] {
 +    var tabs = navigation.preferences.phoneTabs
-+    tabs.insert(5, at: min(4, tabs.count))
++    tabs.insert(5, at: min(3, tabs.count))
 +    return tabs
 +  }
 +  @ViewBuilder
