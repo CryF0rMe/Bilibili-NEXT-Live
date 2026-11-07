@@ -87,23 +87,118 @@ private struct MobileLivePlayer: View {
     let room: Int
     @State private var player: AVPlayer?
     @State private var error: String?
+    @State private var loading = false
+    @State private var retryRevision = 0
+    @State private var fullscreen = false
+    @State private var orientation = MobilePlayerOrientation()
     var body: some View {
-        VStack {
-            if let player { VideoPlayer(player: player).aspectRatio(16/9, contentMode: .fit) }
-            else { ProgressView("正在加载直播") }
-            if let error { Text(error).foregroundStyle(.red) }
-            Text("直播间 \(room)").font(.caption)
-            Spacer()
+        VStack(spacing: 16) {
+            if let player {
+                ZStack {
+                    // Only one video surface owns the player at a time. Moving
+                    // to fullscreen retains the live item and its playback state.
+                    if fullscreen { Color.black }
+                    else { VideoPlayer(player: player) }
+                }.aspectRatio(16 / 9, contentMode: .fit)
+                HStack {
+                    Text("直播间 \(String(room))").font(.caption)
+                    Spacer()
+                    Button("全屏", systemImage: "arrow.up.left.and.arrow.down.right") {
+                        orientation.remember()
+                        fullscreen = true
+                    }
+                    .accessibilityIdentifier("live-enter-fullscreen")
+                }.padding(.horizontal)
+            } else if error == nil {
+                ProgressView("正在加载直播")
+                    .frame(maxWidth: .infinity, minHeight: 200)
+            }
+            if let error {
+                VStack(spacing: 12) {
+                    Text(error).foregroundStyle(.red)
+                    Button("重试播放") { retryRevision += 1 }.disabled(loading)
+                }.padding()
+            }
+            Spacer(minLength: 0)
         }
         .navigationTitle("直播间")
-        .task(id: room) {
-            do {
-                let url = try await LiveAPI.stream(room)
-                guard !Task.isCancelled else { return }
-                player = AVPlayer(url: url)
-                player?.play()
-            } catch { self.error = error.localizedDescription }
+        .navigationBarTitleDisplayMode(.inline)
+        .background(MobilePlayerWindowReader(orientation: orientation))
+        .task(id: "\(room):\(retryRevision)") {
+            // SwiftUI may restart this task after dismissing the cover. Keep
+            // the same stream instead of resolving and opening it a second time.
+            if player == nil { await load() }
         }
-        .onDisappear { player?.pause(); player = nil }
+        .onDisappear {
+            // Presenting fullscreen also hides the inline page; it is not a
+            // navigation exit and must not stop or release the shared player.
+            guard !fullscreen else { return }
+            player?.pause()
+            player = nil
+            orientation.restore()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            orientation.resumePendingRequest()
+        }
+        .fullScreenCover(isPresented: $fullscreen, onDismiss: {
+            orientation.restore()
+        }) {
+            if let player {
+                fullscreenPlayer(player)
+            }
+        }
+    }
+    private func fullscreenPlayer(_ player: AVPlayer) -> some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VideoPlayer(player: player)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+        }
+        .overlay(alignment: .topLeading) {
+            Button {
+                fullscreen = false
+            } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.6), in: .circle)
+            }
+            .buttonStyle(.plain).foregroundStyle(.white).padding(12)
+            .accessibilityLabel("退出全屏")
+            .accessibilityIdentifier("live-exit-fullscreen")
+        }
+        .statusBarHidden()
+        // The existing video player requests landscape only after UIKit has
+        // completed presentation, and restores the actual window on dismissal.
+        .background(MobilePlayerWindowReader(orientation: orientation, requestLandscape: true))
+        .alert("无法调整屏幕方向", isPresented: Binding(
+            get: { orientation.error != nil },
+            set: { if !$0 { orientation.error = nil } }
+        )) {
+            Button("好") { orientation.error = nil }
+        } message: {
+            Text(orientation.error ?? "")
+        }
+    }
+    private func load() async {
+        guard !loading else { return }
+        loading = true
+        error = nil
+        defer { loading = false }
+        do {
+            // Live playback must configure the same media audio session as
+            // ordinary videos before play(), including when iOS is in silent mode.
+            try await MobileAudioSession.shared.activate()
+            try Task.checkCancellation()
+            let url = try await LiveAPI.stream(room)
+            try Task.checkCancellation()
+            let nextPlayer = AVPlayer(url: url)
+            nextPlayer.isMuted = false
+            nextPlayer.volume = 1
+            player = nextPlayer
+            nextPlayer.play()
+        } catch {
+            if !Task.isCancelled { self.error = error.localizedDescription }
+        }
     }
 }

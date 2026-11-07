@@ -24,9 +24,12 @@ diff --git a/Apps/iOS/Sources/MobileAccount.swift b/Apps/iOS/Sources/MobileAccou
 diff --git a/Apps/iOS/Sources/MobileApp.swift b/Apps/iOS/Sources/MobileApp.swift
 --- a/Apps/iOS/Sources/MobileApp.swift
 +++ b/Apps/iOS/Sources/MobileApp.swift
-@@ -12,22 +12,9 @@
-   func activate() async throws {
-     let audio = AVAudioSession.sharedInstance()
+@@ -9,3 +9,3 @@
+ /// Session setup can wait for audio routing; keep it off the interface executor.
+-private actor MobileAudioSession {
++actor MobileAudioSession {
+   static let shared = MobileAudioSession()
+@@ -14,18 +14,5 @@
      try audio.setCategory(.playback, mode: .moviePlayback)
 -    if #available(iOS 27, *) {
 -      try await withCheckedThrowingContinuation {
@@ -48,8 +51,6 @@ diff --git a/Apps/iOS/Sources/MobileApp.swift b/Apps/iOS/Sources/MobileApp.swift
 +    // The dedicated actor keeps the supported synchronous API off the main actor.
 +    try audio.setActive(true)
    }
- }
- 
 diff --git a/Apps/iOS/Sources/MobileBrowse.swift b/Apps/iOS/Sources/MobileBrowse.swift
 --- a/Apps/iOS/Sources/MobileBrowse.swift
 +++ b/Apps/iOS/Sources/MobileBrowse.swift
@@ -199,3 +200,15 @@ diff --git a/Vendor/BiliKitCore/Sources/BiliPlayback/Audio/LoudnessProcessingTap
          parameters.audioTapProcessor = tap
          let mix = AVMutableAudioMix()
          mix.inputParameters = [parameters]
+diff --git a/Apps/iOS/Sources/MobileVideoControls.swift b/Apps/iOS/Sources/MobileVideoControls.swift
+--- a/Apps/iOS/Sources/MobileVideoControls.swift
++++ b/Apps/iOS/Sources/MobileVideoControls.swift
+@@ -59,7 +59,7 @@
+     }
+   }
+ }
+-private struct MobilePlayerWindowReader: UIViewControllerRepresentable {
++struct MobilePlayerWindowReader: UIViewControllerRepresentable {
+   let orientation: MobilePlayerOrientation
+   var requestLandscape = false
+   final class WindowController: UIViewController {
