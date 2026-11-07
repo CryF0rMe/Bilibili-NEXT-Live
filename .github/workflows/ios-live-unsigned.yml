@@ -28,6 +28,7 @@ jobs:
           cp -R upstream/Sources .
           cp -R upstream/Vendor .
           cp -R upstream/Assets .
+          cp upstream/CHANGELOG.md .
           cp -R upstream/Package.swift .
           cp /tmp/MobileLive.swift Apps/iOS/Sources/MobileLive.swift
           python3 Scripts/apply-live-patch.py
