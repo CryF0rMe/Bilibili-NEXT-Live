@@ -19,12 +19,12 @@ jobs:
       - name: Import upstream iOS source
         run: |
           git clone --depth 1 https://github.com/wzk112/Bilibili-NEXT.git upstream
+          cp Apps/iOS/Sources/MobileLive.swift /tmp/MobileLive.swift
           cp -R upstream/Apps .
           cp -R upstream/Sources .
           cp -R upstream/Vendor .
           cp -R upstream/Assets .
           cp -R upstream/Package.swift .
-          cp Apps/iOS/Sources/MobileLive.swift /tmp/MobileLive.swift
           cp /tmp/MobileLive.swift Apps/iOS/Sources/MobileLive.swift
           python3 Scripts/apply-live-patch.py
           test -f Apps/iOS/BilibiliNEXT.xcodeproj/project.pbxproj
