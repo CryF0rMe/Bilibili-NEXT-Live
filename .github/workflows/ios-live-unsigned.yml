@@ -1,0 +1,51 @@
+name: Build iOS Live unsigned IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Apps/iOS/**'
+      - 'Sources/**'
+      - 'Vendor/**'
+      - '.github/workflows/ios-live-unsigned.yml'
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then echo 'Xcode 26 not installed on runner'; ls /Applications; exit 1; fi
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+      - name: Check iOS project exists
+        run: test -f Apps/iOS/BilibiliNEXT.xcodeproj/project.pbxproj
+      - name: Build unsigned iOS app
+        run: |
+          set -o pipefail
+          xcodebuild -project Apps/iOS/BilibiliNEXT.xcodeproj \
+            -scheme BilibiliNEXT -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO build | tee "$RUNNER_TEMP/xcodebuild.log"
+      - name: Package unsigned IPA
+        run: |
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -type d | head -1)
+          test -n "$APP"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+          cd "$RUNNER_TEMP/ipa"
+          zip -qr "$GITHUB_WORKSPACE/Bilibili-NEXT-Live-unsigned.ipa" Payload
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bilibili-NEXT-Live-unsigned-ipa
+          path: Bilibili-NEXT-Live-unsigned.ipa
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
