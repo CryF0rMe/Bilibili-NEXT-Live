@@ -1,0 +1,201 @@
+diff --git a/Apps/iOS/Sources/MobileAccount.swift b/Apps/iOS/Sources/MobileAccount.swift
+--- a/Apps/iOS/Sources/MobileAccount.swift
++++ b/Apps/iOS/Sources/MobileAccount.swift
+@@ -307,6 +307,9 @@
+ struct MobileAccount: View {
+   @Bindable var store: Store
+   private var navigation = NavigationCustomization()
++  init(store: Store) {
++    self.store = store
++  }
+   var body: some View {
+     List {
+       Section {
+@@ -374,6 +377,9 @@
+ struct MobileLibraryLinks: View {
+   @Bindable var store: Store
+   private var navigation = NavigationCustomization()
++  init(store: Store) {
++    self.store = store
++  }
+   var body: some View {
+     ForEach(navigation.preferences.visible.filter(\.isLibrary)) { page in
+       NavigationLink { MobileLibraryDestination(store: store, page: page) } label: {
+diff --git a/Apps/iOS/Sources/MobileApp.swift b/Apps/iOS/Sources/MobileApp.swift
+--- a/Apps/iOS/Sources/MobileApp.swift
++++ b/Apps/iOS/Sources/MobileApp.swift
+@@ -12,22 +12,9 @@
+   func activate() async throws {
+     let audio = AVAudioSession.sharedInstance()
+     try audio.setCategory(.playback, mode: .moviePlayback)
+-    if #available(iOS 27, *) {
+-      try await withCheckedThrowingContinuation {
+-        (continuation: CheckedContinuation<Void, Error>) in
+-        audio.activate(options: []) { active, error in
+-          if let error {
+-            continuation.resume(throwing: error)
+-          } else if active {
+-            continuation.resume()
+-          } else {
+-            continuation.resume(throwing: BiliError(text: "音频输出未能激活"))
+-          }
+-        }
+-      }
+-    } else {
+-      try audio.setActive(true)
+-    }
++    // activate(options:completionHandler:) is watchOS-only in this SDK.
++    // The dedicated actor keeps the supported synchronous API off the main actor.
++    try audio.setActive(true)
+   }
+ }
+ 
+diff --git a/Apps/iOS/Sources/MobileBrowse.swift b/Apps/iOS/Sources/MobileBrowse.swift
+--- a/Apps/iOS/Sources/MobileBrowse.swift
++++ b/Apps/iOS/Sources/MobileBrowse.swift
+@@ -256,6 +256,9 @@
+   @State private var initialLibraryPage: StartPage? = BrowsePreferences().resolvedStart.isLibrary ? BrowsePreferences().resolvedStart : nil
+   private var navigation = NavigationCustomization()
+   @AppStorage("appearance") private var appearance = "system"
++  init(store: Store) {
++    self.store = store
++  }
+   var body: some View {
+     GeometryReader { geometry in
+       let tablet = UIDevice.current.userInterfaceIdiom == .pad
+@@ -290,6 +293,7 @@
+     case 1: "动态"
+     case 2: "消息"
+     case 3: "资料库"
++    case 5: "直播"
+     default: navigation.preferences.allows(.profile) ? "我的" : "设置"
+     }
+   }
+@@ -299,37 +303,63 @@
+     case 1: "rectangle.stack"
+     case 2: "bubble.left.and.bubble.right"
+     case 3: "square.stack"
++    case 5: "dot.radiowaves.left.and.right"
+     default: navigation.preferences.allows(.profile) ? "person.crop.circle" : "gearshape"
++    }
++  }
++  // Resolve the concrete array before entering the TabContentBuilder.
++  private var phoneTabIDs: [Int] {
++    var tabs = navigation.preferences.phoneTabs
++    tabs.insert(5, at: min(4, tabs.count))
++    return tabs
++  }
++  @ViewBuilder
++  private func phoneTabDestination(_ tab: Int) -> some View {
++    switch tab {
++    case 0: MobileHome(store: store)
++    case 1: MobileDynamics(store: store)
++    case 2: MobileInbox(store: store)
++    case 3:
++      MobileLibrary(store: store)
++        .navigationDestination(item: $initialLibraryPage) {
++          MobileLibraryDestination(store: store, page: $0)
++        }
++    case 5: MobileLiveHome()
++    default:
++      if navigation.preferences.allows(.profile) { MobileAccount(store: store) }
++      else { MobileSettings(store: store) }
++    }
++  }
++  private func browseDestination(for tab: Int) -> StartPage {
++    switch tab {
++    case 0:
++      switch store.phoneHomeTab {
++      case 0: .recommend
++      case 1: .popular
++      default: .regions
++      }
++    case 1: .dynamic
++    case 2: .messages
++    case 3: .history
++    default: .profile
+     }
+   }
+   private var phoneTabs: some View {
+     TabView(selection: $selectedTab) {
+-      ForEach(navigation.preferences.phoneTabs, id: \.self) { tab in
++      ForEach(phoneTabIDs, id: \.self) { tab in
+         Tab(tabTitle(tab), systemImage: tabSymbol(tab), value: tab) {
+-          NavigationStack {
+-            switch tab {
+-            case 0: MobileHome(store: store)
+-            case 1: MobileDynamics(store: store)
+-            case 2: MobileInbox(store: store)
+-            case 3:
+-              MobileLibrary(store: store)
+-                .navigationDestination(item: $initialLibraryPage) { MobileLibraryDestination(store: store, page: $0) }
+-            default:
+-              if navigation.preferences.allows(.profile) { MobileAccount(store: store) }
+-              else { MobileSettings(store: store) }
+-            }
+-          }
++          NavigationStack { phoneTabDestination(tab) }
+         }.badge(tab == 2 ? store.messageUnread.counts.total : 0)
+       }
+     }
+     .onChange(of: navigation.preferences) {
+-      if !navigation.preferences.phoneTabs.contains(selectedTab) { selectedTab = navigation.preferences.resolvedStart.phoneTab }
++      if !phoneTabIDs.contains(selectedTab) { selectedTab = navigation.preferences.resolvedStart.phoneTab }
+       if let page = initialLibraryPage, !navigation.preferences.allows(page) { initialLibraryPage = nil }
+       store.isRecommendedVisible = selectedTab == 0 && store.phoneHomeTab == 0
+     }
+     .onChange(of: selectedTab) { old, value in
+       store.isRecommendedVisible = value == 0 && store.phoneHomeTab == 0
+-      store.browseDestination = value == 0 ? (store.phoneHomeTab == 0 ? .recommend : store.phoneHomeTab == 1 ? .popular : .regions) : value == 1 ? .dynamic : value == 2 ? .messages : value == 3 ? .history : .profile
++      store.browseDestination = browseDestination(for: value)
+       if old != 0 && value == 0 { store.homeReturnRevision += 1 }
+     }
+     .onAppear {
+diff --git a/Sources/BiliGlass/BAS.swift b/Sources/BiliGlass/BAS.swift
+--- a/Sources/BiliGlass/BAS.swift
++++ b/Sources/BiliGlass/BAS.swift
+@@ -85,7 +85,13 @@
+     if key == "color" {
+       let a = Int(c.from.scalar), b = Int(c.to.scalar)
+       var color = 0
+-      for shift in [0,8,16] { color |= Int((Double((a>>shift)&255) * (1-p) + Double((b>>shift)&255) * p).rounded()) << shift }
++      for shift in [0, 8, 16] {
++        let fromChannel = Double((a >> shift) & 255)
++        let toChannel = Double((b >> shift) & 255)
++        let blendedChannel = fromChannel * (1 - p) + toChannel * p
++        let roundedChannel = Int(blendedChannel.rounded())
++        color |= roundedChannel << shift
++      }
+       return .number(Double(color))
+     }
+     // Preserve percent units when possible; mixed units use current viewport/parent dimensions.
+diff --git a/Vendor/BiliKitCore/Sources/BiliPlayback/Audio/LoudnessProcessingTap.swift b/Vendor/BiliKitCore/Sources/BiliPlayback/Audio/LoudnessProcessingTap.swift
+--- a/Vendor/BiliKitCore/Sources/BiliPlayback/Audio/LoudnessProcessingTap.swift
++++ b/Vendor/BiliKitCore/Sources/BiliPlayback/Audio/LoudnessProcessingTap.swift
+@@ -57,6 +57,10 @@
+             process: process
+         )
+         var createdTap: MTAudioProcessingTap?
++        #if os(iOS)
++        retainedState.release()
++        return nil
++        #else
+         let status = MTAudioProcessingTapCreateWithPreferredFormat(
+             kCFAllocatorDefault,
+             &callbacks,
+@@ -69,12 +73,15 @@
+             return nil
+         }
+         return LoudnessProcessingTap(state: state, tap: createdTap)
++        #endif
+     }
+ 
+     @available(macOS 27.0, iOS 27.0, *)
+     func makeAudioMix() -> AVAudioMix {
+         let parameters = AVMutableAudioMixInputParameters()
++        #if !os(iOS)
+         parameters.trackID = AVAudioMixInputParametersTrackID.mixID.rawValue
++        #endif
+         parameters.audioTapProcessor = tap
+         let mix = AVMutableAudioMix()
+         mix.inputParameters = [parameters]

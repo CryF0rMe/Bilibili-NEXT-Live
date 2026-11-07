@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'Apps/iOS/**'
-      - 'Scripts/apply-live-patch.py'
+      - 'Scripts/**'
       - '.github/workflows/ios-live-unsigned.yml'
 jobs:
   build:
@@ -22,7 +22,11 @@ jobs:
           swift --version
       - name: Import upstream iOS source
         run: |
-          git clone --depth 1 https://github.com/wzk112/Bilibili-NEXT.git upstream
+          git init upstream
+          git -C upstream remote add origin https://github.com/wzk112/Bilibili-NEXT.git
+          git -C upstream fetch --depth 1 origin 67bcc018d408e91b8427f2a7e667ddbd0f2ab011
+          git -C upstream checkout --detach FETCH_HEAD
+          git -C upstream log -1 --format='Upstream revision: %H %s'
           cp Apps/iOS/Sources/MobileLive.swift /tmp/MobileLive.swift
           cp -R upstream/Apps .
           cp -R upstream/Sources .
