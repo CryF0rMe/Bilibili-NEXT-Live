@@ -21,6 +21,7 @@ def main() -> None:
         ("MobileLive.swift", "A11111111111111111111111", "A22222222222222222222222"),
         ("MobileLiveAPI.swift", "A33333333333333333333333", "A44444444444444444444444"),
         ("MobileLiveModel.swift", "A55555555555555555555555", "A66666666666666666666666"),
+        ("MobileLivePlayback.swift", "A77777777777777777777777", "A88888888888888888888888"),
     ]
     entries = []
     for name, file_id, build_id in files:

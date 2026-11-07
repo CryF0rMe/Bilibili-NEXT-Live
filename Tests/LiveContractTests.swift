@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 private struct ContractFailure: Error, CustomStringConvertible {
     let description: String
@@ -62,6 +63,21 @@ private struct ContractFailure: Error, CustomStringConvertible {
         try expect(!request.httpShouldHandleCookies && request.value(forHTTPHeaderField: "Cookie") == nil, "Public requests carry no Cookie header")
         try expect(!LiveAPI.session.configuration.httpShouldSetCookies && LiveAPI.session.configuration.httpCookieStorage == nil, "Public session does not inherit login cookies")
 
+        let key = try LiveAPI.decodeWBIKey(fixture("anonymous-wbi-nav"))
+        try expect(key == "1022a87ffdaf532cb45ee953dce8c96d", "Anonymous nav may return public signing images with code -101")
+        let signed = LiveWBISigner.sign(["search_type": "live_room", "keyword": "advent +中文!'()*", "page": "1"],
+            key: "0123456789abcdef0123456789abcdef", timestamp: 1702204169)
+        try expect(signed["w_rid"] == "3f5507d836618900c1a124d0ea00e53a", "WBI signing matches independent RFC-3986/MD5 calculation")
+        try expect(signed["keyword"] == "advent +中文" && signed["wts"] == "1702204169", "Sanitize reserved signing characters without changing keyword content")
+        let encoded = LiveWBISigner.encoded(["keyword": "a +中文"])
+        try expect(encoded == "keyword=a%20%2B%E4%B8%AD%E6%96%87", "Signed requests encode plus, space, and Chinese consistently")
+
+        let playbackPayload = try LiveAPI.decode(fixture("playback-sources"), as: LiveRoomPlayPayload.self)
+        let urls = playbackPayload.compatibleURLs()
+        try expect(urls.count == 3, "Retain unique AVC/HLS CDNs and reject FLV, HEVC, and insecure sources")
+        try expect(urls.map(\.host) == ["fmp4-a.example.test", "fmp4-b.example.test", "ts.example.test"], "Prefer both fMP4 CDNs before legacy TS")
+        try expect(urls.allSatisfy { $0.pathExtension == "m3u8" && $0.query == "qn=400" }, "Preserve complete server-provided HLS URLs")
+
         let examples = first.rooms.items
         let page1 = LiveRoomPage(rooms: [examples[0], examples[0], examples[1]], hasMore: true)
         let page2 = LiveRoomPage(rooms: [examples[1], examples[2]], hasMore: true)
@@ -116,7 +132,31 @@ private struct ContractFailure: Error, CustomStringConvertible {
         await staleMore.value
         try expect(refreshing.rooms.map(\.id) == [examples[3].id], "Old pagination cannot append after refresh")
 
-        print("PASS: \(checks) live API, cookie isolation, pagination, retry, and stale-response checks")
+        // Exercise AVPlayer's real failed-item -> next-source transition using
+        // the upstream's small H.264 file, without relying on a public CDN.
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        let base64 = try String(contentsOf: directory.appendingPathComponent("player-video.mp4.base64"), encoding: .utf8)
+        guard let video = Data(base64Encoded: base64, options: .ignoreUnknownCharacters) else { throw ContractFailure(description: "Invalid media fixture") }
+        let localVideo = temporary.appendingPathComponent("valid.mp4")
+        try video.write(to: localVideo)
+        let playback = LivePlaybackState()
+        playback.open([temporary.appendingPathComponent("missing.mp4"), localVideo])
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            let asset = playback.player?.currentItem?.asset as? AVURLAsset
+            if asset?.url == localVideo && playback.player?.currentItem?.status == .readyToPlay { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let selectedAsset = playback.player?.currentItem?.asset as? AVURLAsset
+        try expect(selectedAsset?.url == localVideo && playback.player?.currentItem?.status == .readyToPlay, "Failed AVPlayer source automatically advances to playable H.264 media")
+        try expect(playback.error == nil, "Successful fallback does not retain a stale playback error")
+        playback.stop()
+        try await Task.sleep(for: .milliseconds(100))
+        try expect(playback.player == nil && !playback.preparing, "Leaving playback releases the item and ignores late observations")
+
+        print("PASS: \(checks) live API, signing, playback fallback, cookie isolation, pagination, retry, and stale-response checks")
     }
 }
 

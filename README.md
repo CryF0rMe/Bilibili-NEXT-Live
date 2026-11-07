@@ -21,17 +21,22 @@ directly. The category picker supports parent categories and searchable subareas
 Direct room-number entry remains available in the toolbar.
 
 Public discovery uses a separate cookie-free session and checks both HTTP status
-and the Bilibili service code. Errors remain visible instead of appearing as an
-empty list. See [verified API notes](Docs/LIVE_API_NOTES.md) for endpoint details
-and temporary service restrictions.
+and the Bilibili service code. Search uses the normal WBI-signed web endpoint and
+public anonymous navigation keys. Errors remain visible instead of appearing as
+an empty list. See [verified API notes](Docs/LIVE_API_NOTES.md) for endpoint details.
+
+Live playback prefers AVC over HLS/fMP4, retains multiple CDNs, and switches to
+another supplied source after a load failure or connection timeout. The player
+shows buffering and failure status while preserving audio activation and the
+existing fullscreen/orientation behavior.
 
 ## CI
 
 The workflow imports pinned upstream revision
 `67bcc018d408e91b8427f2a7e667ddbd0f2ab011`, applies the reviewed compatibility
 patch, registers all Live sources, runs the API/pagination contract checks, and
-builds and uploads `Bilibili-NEXT-Live-unsigned.ipa`. The device-tested player
-implementation is retained during the discovery work.
+builds and uploads `Bilibili-NEXT-Live-unsigned.ipa`. The checks also exercise real
+AVPlayer failed-item fallback and shutdown against a small upstream H.264 fixture.
 
 The fixtures under `Tests/Fixtures` are reduced public API captures for tests;
 they are never bundled as live recommendations. No account cookies or credentials

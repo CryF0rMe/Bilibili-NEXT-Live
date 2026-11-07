@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import Observation
 
 struct MobileLiveHome: View {
     @State private var feed = LiveBrowseModel()
@@ -235,20 +236,22 @@ private struct LiveAreaPicker: View {
 
 private struct MobileLivePlayer: View {
     let room: Int
-    @State private var player: AVPlayer?
-    @State private var error: String?
+    @State private var playback = LivePlaybackState()
     @State private var loading = false
     @State private var retryRevision = 0
     @State private var fullscreen = false
     @State private var orientation = MobilePlayerOrientation()
     var body: some View {
         VStack(spacing: 16) {
-            if let player {
+            if let player = playback.player {
                 ZStack {
                     // Only one video surface owns the player at a time. Moving
                     // to fullscreen retains the live item and its playback state.
                     if fullscreen { Color.black }
-                    else { VideoPlayer(player: player) }
+                    else {
+                        VideoPlayer(player: player)
+                            .overlay { playbackStatus }
+                    }
                 }.aspectRatio(16 / 9, contentMode: .fit)
                 HStack {
                     Text("直播间 \(String(room))").font(.caption)
@@ -259,11 +262,11 @@ private struct MobileLivePlayer: View {
                     }
                     .accessibilityIdentifier("live-enter-fullscreen")
                 }.padding(.horizontal)
-            } else if error == nil {
+            } else if playback.error == nil {
                 ProgressView("正在加载直播")
                     .frame(maxWidth: .infinity, minHeight: 200)
             }
-            if let error {
+            if let error = playback.error {
                 VStack(spacing: 12) {
                     Text(error).foregroundStyle(.red)
                     Button("重试播放") { retryRevision += 1 }.disabled(loading)
@@ -277,14 +280,13 @@ private struct MobileLivePlayer: View {
         .task(id: "\(room):\(retryRevision)") {
             // SwiftUI may restart this task after dismissing the cover. Keep
             // the same stream instead of resolving and opening it a second time.
-            if player == nil { await load() }
+            if playback.player == nil { await load() }
         }
         .onDisappear {
             // Presenting fullscreen also hides the inline page; it is not a
             // navigation exit and must not stop or release the shared player.
             guard !fullscreen else { return }
-            player?.pause()
-            player = nil
+            playback.stop()
             orientation.restore()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -293,17 +295,19 @@ private struct MobileLivePlayer: View {
         .fullScreenCover(isPresented: $fullscreen, onDismiss: {
             orientation.restore()
         }) {
-            if let player {
-                fullscreenPlayer(player)
-            }
+            fullscreenPlayer
+                .task(id: retryRevision) { if playback.player == nil { await load() } }
         }
     }
-    private func fullscreenPlayer(_ player: AVPlayer) -> some View {
+    private var fullscreenPlayer: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VideoPlayer(player: player)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea()
+            if let player = playback.player {
+                VideoPlayer(player: player)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+            }
+            playbackStatus
         }
         .overlay(alignment: .topLeading) {
             Button {
@@ -330,25 +334,35 @@ private struct MobileLivePlayer: View {
             Text(orientation.error ?? "")
         }
     }
+    @ViewBuilder private var playbackStatus: some View {
+        if let error = playback.error {
+            VStack(spacing: 12) {
+                Text(error).font(.callout).multilineTextAlignment(.center)
+                Button("重试播放") { retryRevision += 1 }.disabled(loading)
+            }
+            .padding(20).foregroundStyle(.white)
+            .background(.black.opacity(0.75), in: .rect(cornerRadius: 14))
+            .padding(24)
+        } else if playback.preparing {
+            ProgressView(playback.notice).tint(.white).foregroundStyle(.white)
+                .padding(16).background(.black.opacity(0.65), in: .rect(cornerRadius: 12))
+        }
+    }
     private func load() async {
         guard !loading else { return }
         loading = true
-        error = nil
+        playback.beginLoading()
         defer { loading = false }
         do {
             // Live playback must configure the same media audio session as
             // ordinary videos before play(), including when iOS is in silent mode.
             try await MobileAudioSession.shared.activate()
             try Task.checkCancellation()
-            let url = try await LiveAPI.stream(room)
+            let urls = try await LiveAPI.streams(room)
             try Task.checkCancellation()
-            let nextPlayer = AVPlayer(url: url)
-            nextPlayer.isMuted = false
-            nextPlayer.volume = 1
-            player = nextPlayer
-            nextPlayer.play()
+            playback.open(urls)
         } catch {
-            if !Task.isCancelled { self.error = error.localizedDescription }
+            if !Task.isCancelled { playback.fail(error.localizedDescription) }
         }
     }
 }

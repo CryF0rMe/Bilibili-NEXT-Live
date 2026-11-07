@@ -1,0 +1,10 @@
+{
+  "code": -101,
+  "message": "not logged in",
+  "data": {
+    "wbi_img": {
+      "img_url": "https://example.test/0123456789abcdef0123456789abcdef.png",
+      "sub_url": "https://example.test/fedcba9876543210fedcba9876543210.png"
+    }
+  }
+}

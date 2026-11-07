@@ -45,6 +45,7 @@ jobs:
           swiftc -swift-version 6 -parse-as-library \
             Apps/iOS/Sources/MobileLiveAPI.swift \
             Apps/iOS/Sources/MobileLiveModel.swift \
+            Apps/iOS/Sources/MobileLivePlayback.swift \
             Tests/LiveContractTests.swift \
             -o "$RUNNER_TEMP/live-contract-tests"
           "$RUNNER_TEMP/live-contract-tests" "$GITHUB_WORKSPACE/Tests/Fixtures"

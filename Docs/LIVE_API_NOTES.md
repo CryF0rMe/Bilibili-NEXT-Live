@@ -29,25 +29,45 @@ page ends pagination; a failed page can be retried without discarding loaded roo
 Generation guards prevent old search/category/page requests from overwriting a
 new selection or refresh.
 
-The public search service intermittently returns HTTP 412. A separate
-`live_user` search request and one exact Chinese-title request returned 412 during
-verification, so the app uses the verified `live_room` search and reports HTTP
-errors visibly. It does not ask for cookies, bypass service challenges, or replace
-failed searches with fabricated results. Recommendations and categories remain
-independent of search availability.
+The initial unsigned search endpoint returned HTTP 412 on the user's device.
+Follow-up verification compared both requests for `advent`: the unsigned endpoint
+returned HTTP 412, while `/x/web-interface/wbi/search/type` with normal WBI signing
+returned HTTP 200, `code: 0`, and `CS-advent` (room 1883358196). Public signing image
+keys were obtained from anonymous `/x/web-interface/nav`, whose `code: -101` still
+included `data.wbi_img`. The client now uses this signed endpoint, the upstream's
+signing algorithm, canonical RFC-3986 query encoding, and a short in-memory key
+cache. It continues to send no account cookies or login credentials. Service
+challenges are reported instead of automatically circumvented.
 
 The existing H5 playback endpoint was also checked with a room obtained from
 search: HTTP 200, `code: 0`, and two HTTPS stream URLs in `data.durl`.
+
+However, checking the actual playlists for three subsequently recommended rooms
+showed that their legacy/TS URLs timed out. The modern
+`/xlive/web-room/v2/index/getRoomPlayInfo` endpoint, requested with `protocol=1`,
+`format=1,2`, `codec=0`, and `qn=400`, returned AVC/HLS sources. For all three rooms,
+the fMP4 playlist returned HTTP 200 with `#EXTM3U` while the sampled TS playlist
+timed out. Playback therefore prefers HLS/fMP4, keeps all compatible CDNs, and
+retains HLS/TS and the old H5 API as fallbacks where applicable. It never passes
+FLV or an unsupported codec to AVPlayer merely because the metadata API succeeded.
+
+The reproducible `live-diagnostics.yml` workflow logs service results, format and
+codec names, and playlist reachability. It does not log account cookies, signing
+keys, signatures, or full temporary stream URLs.
 
 ## Regression checks and device validation
 
 `Tests/Fixtures` contains reduced real captures with tracking/session fields
 removed. They are test input only and are not part of the Xcode app target.
 `Tests/LiveContractTests.swift` checks envelope errors, metadata, normalization,
-cookie isolation, pagination, retries, and stale request results. The CI command
-compiles the actual API and model source files before running these checks.
+cookie isolation, signing, source selection, pagination, retries, and stale
+request results. It also exercises AVPlayer's actual failed-item-to-H.264-source
+transition and verifies that stop releases playback and ignores old callbacks.
+The CI command compiles the actual API, browse model and playback state sources.
 
-The player view is preserved byte-for-byte from the device-tested implementation
-at `3e00aadff`. Discovery card navigation, actual image loading, search/category
-responses from the user's network, and continued video/audio/fullscreen playback
-should still be validated on a device with the new IPA.
+Audio activation, inline/fullscreen ownership and window-aware orientation
+restoration are retained. The playback state now watches AVPlayerItem failure and
+buffering, attempts another supplied CDN after a failure or 12-second connection
+timeout, and shows an actionable error after exhausting sources. Device testing
+should cover the reported search term, several recommendation cards, source
+loading feedback, audio, fullscreen, and leaving the room.

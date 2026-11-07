@@ -14,11 +14,13 @@ jobs:
       - name: Inspect public responses without account credentials
         run: |
           python3 - <<'PY'
-          import json, hashlib, time
+          import json, hashlib, time, os
+          from pathlib import Path
           from urllib.request import Request, urlopen
           from urllib.parse import urlencode, urlparse
           from concurrent.futures import ThreadPoolExecutor
           HEADERS = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://live.bilibili.com/', 'Accept': 'application/json'}
+          verified_media = []
           def fetch(url, limit=2 * 1024 * 1024):
               try:
                   with urlopen(Request(url, headers=HEADERS), timeout=12) as r:
@@ -77,8 +79,48 @@ jobs:
                               url=urls[0]['host']+codec['base_url']+urls[0].get('extra','')
                               manifest_status, body, mime=fetch(url)
                               result.update({'http':manifest_status,'mime':mime,'hls':body.startswith(b'#EXTM3U')})
+                              if fmt.get('format_name') == 'fmp4' and manifest_status == 200 and body.startswith(b'#EXTM3U'):
+                                  verified_media.append({'room': roomid, 'url': url})
                           details.append(result)
               emit('hls-avc-playback',room=roomid,http=status,code=modern.get('code'),live_status=data.get('live_status'),sources=details)
           with ThreadPoolExecutor(max_workers=3) as pool:
               list(pool.map(inspect,rows[:3]))
+          Path(os.environ['RUNNER_TEMP'], 'live-media-probes.json').write_text(json.dumps(verified_media[:2]))
+          PY
+      - name: Verify AVFoundation can read live media
+        timeout-minutes: 2
+        run: |
+          cat > "$RUNNER_TEMP/MediaProbe.swift" <<'SWIFT'
+          import Foundation
+          import AVFoundation
+          @main struct MediaProbe {
+              struct Source: Decodable { let room: Int; let url: URL }
+              static func main() async throws {
+                  let input = URL(fileURLWithPath: ProcessInfo.processInfo.environment["RUNNER_TEMP"]!).appendingPathComponent("live-media-probes.json")
+                  let sources = try JSONDecoder().decode([Source].self, from: Data(contentsOf: input))
+                  for source in sources {
+                      let asset = AVURLAsset(url: source.url)
+                      do {
+                          let playable = try await asset.load(.isPlayable)
+                          let video = try await asset.loadTracks(withMediaType: .video)
+                          let audio = try await asset.loadTracks(withMediaType: .audio)
+                          let result: [String: Any] = ["check": "avfoundation-media", "room": source.room, "playable": playable, "video_tracks": video.count, "audio_tracks": audio.count]
+                          let data = try JSONSerialization.data(withJSONObject: result, options: .sortedKeys)
+                          print(String(decoding: data, as: UTF8.self))
+                      } catch {
+                          let failure = error as NSError
+                          print("AVFoundation metadata failed: \(failure.domain) \(failure.code)")
+                      }
+                  }
+              }
+          }
+          SWIFT
+          swiftc -parse-as-library "$RUNNER_TEMP/MediaProbe.swift" -o "$RUNNER_TEMP/media-probe"
+          python3 - <<'PY'
+          import subprocess,os
+          try:
+              result=subprocess.run([os.path.join(os.environ['RUNNER_TEMP'],'media-probe')],capture_output=True,text=True,timeout=60)
+              for line in result.stdout.splitlines():
+                  if line.startswith('{') or line.startswith('AVFoundation metadata failed:'):print(line)
+          except subprocess.TimeoutExpired:print('AVFoundation metadata timeout; no stream URLs logged')
           PY

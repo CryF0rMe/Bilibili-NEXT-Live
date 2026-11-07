@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 enum LiveBrowseQuery: Hashable, Sendable {
     case recommendations
@@ -23,6 +24,7 @@ enum LiveError: LocalizedError, Sendable {
     case service(Int, String)
     case invalidResponse
     case unavailableStream
+    case roomOffline
 
     var errorDescription: String? {
         switch self {
@@ -36,6 +38,8 @@ enum LiveError: LocalizedError, Sendable {
             "直播数据格式异常，请稍后重试。"
         case .unavailableStream:
             "暂时无法获取播放地址，直播间可能已下播，请稍后重试。"
+        case .roomOffline:
+            "这个直播间当前未开播，可以返回选择其他直播。"
         }
     }
 }
@@ -193,9 +197,101 @@ struct LiveSearchPayload: Decodable, Sendable {
         numberOfPages = c.integer(.numPages)
     }
 }
-private struct LiveStreamPayload: Decodable, Sendable {
+struct LiveStreamPayload: Decodable, Sendable {
     struct Entry: Decodable, Sendable { let url: String }
     let durl: [Entry]
+}
+
+struct LiveRoomPlayPayload: Decodable, Sendable {
+    struct PlayURLInfo: Decodable, Sendable { let playurl: PlayURL? }
+    struct PlayURL: Decodable, Sendable { let stream: [Stream] }
+    struct Stream: Decodable, Sendable {
+        let protocol_name: String
+        let format: [Format]
+    }
+    struct Format: Decodable, Sendable {
+        let format_name: String
+        let codec: [Codec]
+    }
+    struct Codec: Decodable, Sendable {
+        let codec_name: String
+        let base_url: String
+        let url_info: [CDN]
+    }
+    struct CDN: Decodable, Sendable {
+        let host: String
+        let extra: String?
+    }
+    let live_status: Int?
+    let playurl_info: PlayURLInfo?
+
+    func compatibleURLs() -> [URL] {
+        let streams = playurl_info?.playurl?.stream ?? []
+        var ranked: [(Int, URL)] = []
+        for stream in streams where stream.protocol_name == "http_hls" {
+            for format in stream.format where ["fmp4", "ts"].contains(format.format_name) {
+                for codec in format.codec where codec.codec_name == "avc" {
+                    for cdn in codec.url_info {
+                        let raw = cdn.host + codec.base_url + (cdn.extra ?? "")
+                        guard let url = URL(string: raw), url.scheme == "https",
+                              url.host != nil, url.pathExtension.lowercased() == "m3u8" else { continue }
+                        // The sampled legacy/TS sources timed out while fMP4 was
+                        // reachable. Keep every CDN as a fallback, fMP4 first.
+                        ranked.append((format.format_name == "fmp4" ? 0 : 1, url))
+                    }
+                }
+            }
+        }
+        var seen = Set<URL>()
+        return ranked.enumerated().sorted {
+            $0.element.0 == $1.element.0 ? $0.offset < $1.offset : $0.element.0 < $1.element.0
+        }.map { $0.element.1 }.filter { seen.insert($0).inserted }
+    }
+}
+
+enum LiveWBISigner {
+    static func mixin(image: String, sub: String) throws -> String {
+        guard let imageURL = URL(string: image), let subURL = URL(string: sub) else { throw LiveError.invalidResponse }
+        let source = Array(imageURL.deletingPathExtension().lastPathComponent + subURL.deletingPathExtension().lastPathComponent)
+        let table = [46,47,18,2,53,8,23,32,15,50,10,31,58,3,45,35,27,43,5,49,33,9,42,19,29,28,14,39,12,38,41,13,37,48,7,16,24,55,40,61,26,17,0,1,60,51,30,4,22,25,54,21,56,59,6,63,57,62,11,36,20,34,44,52]
+        guard source.count >= 64 else { throw LiveError.invalidResponse }
+        return String(table.prefix(32).map { source[$0] })
+    }
+    static func encoded(_ parameters: [String: String]) -> String {
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return parameters.sorted { $0.key < $1.key }.map {
+            let key = $0.key.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+            let value = $0.value.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+            return key + "=" + value
+        }.joined(separator: "&")
+    }
+    static func sign(_ parameters: [String: String], key: String, timestamp: Int = Int(Date().timeIntervalSince1970)) -> [String: String] {
+        var query = parameters.mapValues { $0.filter { !"!'()*".contains($0) } }
+        query["wts"] = String(timestamp)
+        let digest = Insecure.MD5.hash(data: Data((encoded(query) + key).utf8))
+        query["w_rid"] = digest.map { String(format: "%02x", $0) }.joined()
+        return query
+    }
+}
+
+private struct LiveWBINav: Decodable, Sendable {
+    struct Payload: Decodable, Sendable {
+        struct Images: Decodable, Sendable { let img_url: String; let sub_url: String }
+        let wbi_img: Images?
+    }
+    let code: Int
+    let message: String?
+    let data: Payload?
+}
+private actor LiveWBIKeyCache {
+    static let shared = LiveWBIKeyCache()
+    private var cached: (key: String, expires: Date)?
+    func key() async throws -> String {
+        if let cached, cached.expires > Date() { return cached.key }
+        let key = try await LiveAPI.fetchWBIKey()
+        cached = (key, Date().addingTimeInterval(1800))
+        return key
+    }
 }
 
 struct LiveRoomPage: Sendable {
@@ -240,21 +336,41 @@ enum LiveAPI {
         guard let payload = envelope.data else { throw LiveError.invalidResponse }
         return payload
     }
-    private static func request<Payload: Decodable & Sendable>(
+    private static func responseData(
         _ path: String, host: String = "api.live.bilibili.com",
-        parameters: [URLQueryItem] = [], as type: Payload.Type
-    ) async throws -> Payload {
+        parameters: [URLQueryItem] = []
+    ) async throws -> Data {
         var components = URLComponents()
         components.scheme = "https"
         components.host = host
         components.path = path
-        components.queryItems = parameters.isEmpty ? nil : parameters
+        if !parameters.isEmpty {
+            let query = Dictionary(parameters.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { _, new in new })
+            components.percentEncodedQuery = LiveWBISigner.encoded(query)
+        }
         guard let url = components.url else { throw LiveError.invalidResponse }
         let (data, response) = try await session.data(for: makeRequest(url))
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse else { throw LiveError.invalidResponse }
         guard response.statusCode == 200 else { throw LiveError.http(response.statusCode) }
+        return data
+    }
+    private static func request<Payload: Decodable & Sendable>(
+        _ path: String, host: String = "api.live.bilibili.com",
+        parameters: [URLQueryItem] = [], as type: Payload.Type
+    ) async throws -> Payload {
+        let data = try await responseData(path, host: host, parameters: parameters)
         return try decode(data, as: type)
+    }
+    static func decodeWBIKey(_ data: Data) throws -> String {
+        let nav = try JSONDecoder().decode(LiveWBINav.self, from: data)
+        guard nav.code == 0 || nav.code == -101 else { throw LiveError.service(nav.code, nav.message ?? "") }
+        guard let images = nav.data?.wbi_img else { throw LiveError.invalidResponse }
+        return try LiveWBISigner.mixin(image: images.img_url, sub: images.sub_url)
+    }
+    fileprivate static func fetchWBIKey() async throws -> String {
+        let data = try await responseData("/x/web-interface/nav", host: "api.bilibili.com")
+        return try decodeWBIKey(data)
     }
     static func rooms(for query: LiveBrowseQuery, page: Int) async throws -> LiveRoomPage {
         switch query {
@@ -269,10 +385,11 @@ enum LiveAPI {
             let more = payload.count.map { page * 30 < $0 } ?? (payload.rooms.rawCount >= 30)
             return LiveRoomPage(rooms: payload.rooms.items, hasMore: more)
         case .search(let keyword):
-            let payload = try await request("/x/web-interface/search/type", host: "api.bilibili.com", parameters: [
-                .init(name: "search_type", value: "live_room"), .init(name: "keyword", value: keyword),
-                .init(name: "page", value: String(page))
-            ], as: LiveSearchPayload.self)
+            let key = try await LiveWBIKeyCache.shared.key()
+            let signed = LiveWBISigner.sign(["search_type": "live_room", "keyword": keyword, "page": String(page)], key: key)
+            let payload = try await request("/x/web-interface/wbi/search/type", host: "api.bilibili.com",
+                parameters: signed.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) },
+                as: LiveSearchPayload.self)
             let more = payload.numberOfPages.map { page < $0 } ?? (payload.rooms.rawCount > 0)
             return LiveRoomPage(rooms: payload.rooms.items, hasMore: more)
         }
@@ -298,13 +415,34 @@ enum LiveAPI {
         try await request("/room/v1/Area/getList", as: [LiveAreaGroup].self)
     }
     static func stream(_ room: Int) async throws -> URL {
+        guard let url = try await streams(room).first else { throw LiveError.unavailableStream }
+        return url
+    }
+    static func streams(_ room: Int) async throws -> [URL] {
+        do {
+            let payload = try await request("/xlive/web-room/v2/index/getRoomPlayInfo", parameters: [
+                .init(name: "room_id", value: String(room)), .init(name: "protocol", value: "1"),
+                .init(name: "format", value: "1,2"), .init(name: "codec", value: "0"),
+                .init(name: "qn", value: "400"), .init(name: "platform", value: "h5"),
+                .init(name: "ptype", value: "8")
+            ], as: LiveRoomPlayPayload.self)
+            if let status = payload.live_status, status != 1 { throw LiveError.roomOffline }
+            let urls = payload.compatibleURLs()
+            if !urls.isEmpty { return urls }
+        } catch LiveError.roomOffline { throw LiveError.roomOffline }
+        catch { try Task.checkCancellation() }
+        // Retain the old H5 source only when no compatible modern source exists.
+        // It is not used as the first CDN for every room anymore.
         let payload = try await request("/room/v1/Room/playUrl", parameters: [
             .init(name: "cid", value: String(room)), .init(name: "platform", value: "h5"),
             .init(name: "quality", value: "10000")
         ], as: LiveStreamPayload.self)
-        guard let raw = payload.durl.first?.url, let url = URL(string: raw),
-              let scheme = url.scheme, ["http", "https"].contains(scheme), url.host != nil
-        else { throw LiveError.unavailableStream }
-        return url
+        let urls = payload.durl.compactMap { entry -> URL? in
+            guard let url = URL(string: entry.url), url.scheme == "https", url.host != nil,
+                  url.pathExtension.lowercased() == "m3u8" else { return nil }
+            return url
+        }
+        guard !urls.isEmpty else { throw LiveError.unavailableStream }
+        return urls
     }
 }

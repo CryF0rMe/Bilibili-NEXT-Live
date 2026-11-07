@@ -1,0 +1,89 @@
+{
+  "code": 0,
+  "data": {
+    "live_status": 1,
+    "playurl_info": {
+      "playurl": {
+        "stream": [
+          {
+            "protocol_name": "http_stream",
+            "format": [
+              {
+                "format_name": "flv",
+                "codec": [
+                  {
+                    "codec_name": "avc",
+                    "base_url": "/live/source.flv",
+                    "url_info": [
+                      {
+                        "host": "https://flv.example.test",
+                        "extra": "?qn=400"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "protocol_name": "http_hls",
+            "format": [
+              {
+                "format_name": "ts",
+                "codec": [
+                  {
+                    "codec_name": "avc",
+                    "base_url": "/live/ts.m3u8",
+                    "url_info": [
+                      {
+                        "host": "https://ts.example.test",
+                        "extra": "?qn=400"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "format_name": "fmp4",
+                "codec": [
+                  {
+                    "codec_name": "hevc",
+                    "base_url": "/live/hevc.m3u8",
+                    "url_info": [
+                      {
+                        "host": "https://hevc.example.test",
+                        "extra": "?qn=400"
+                      }
+                    ]
+                  },
+                  {
+                    "codec_name": "avc",
+                    "base_url": "/live/fmp4.m3u8",
+                    "url_info": [
+                      {
+                        "host": "https://fmp4-a.example.test",
+                        "extra": "?qn=400"
+                      },
+                      {
+                        "host": "https://fmp4-b.example.test",
+                        "extra": "?qn=400"
+                      },
+                      {
+                        "host": "https://fmp4-a.example.test",
+                        "extra": "?qn=400"
+                      },
+                      {
+                        "host": "http://insecure.example.test",
+                        "extra": "?qn=400"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
