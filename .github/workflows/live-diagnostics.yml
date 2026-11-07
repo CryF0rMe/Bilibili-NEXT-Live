@@ -94,7 +94,7 @@ jobs:
           import Foundation
           import AVFoundation
           import CoreVideo
-          @main struct MediaProbe {
+          @main @MainActor struct MediaProbe {
               struct Source: Decodable { let room: Int; let url: URL }
               static func main() async throws {
                   let input = URL(fileURLWithPath: ProcessInfo.processInfo.environment["RUNNER_TEMP"]!).appendingPathComponent("live-media-probes.json")
@@ -110,19 +110,23 @@ jobs:
                           player.isMuted = true
                           player.play()
                           var decodedFrame = false
+                          var firstFrameAt: Date?
                           for _ in 0..<100 {
                               if item.status == .failed { break }
                               let time = item.currentTime()
                               if time.isValid, output.hasNewPixelBuffer(forItemTime: time),
                                  output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) != nil {
                                   decodedFrame = true
-                                  break
+                                  if firstFrameAt == nil { firstFrameAt = Date() }
                               }
+                              if let firstFrameAt, Date().timeIntervalSince(firstFrameAt) >= 3,
+                                 item.status == .readyToPlay, player.timeControlStatus == .playing { break }
                               try await Task.sleep(for: .milliseconds(200))
                           }
                           let video = item.tracks.filter { $0.assetTrack?.mediaType == .video }
                           let audio = item.tracks.filter { $0.assetTrack?.mediaType == .audio }
-                          let result: [String: Any] = ["check": "avfoundation-media", "room": source.room, "playable": playable, "ready": item.status == .readyToPlay, "playing": player.timeControlStatus == .playing, "decoded_frame": decodedFrame, "width": Int(item.presentationSize.width), "video_tracks": video.count, "audio_tracks": audio.count]
+                          let failure = item.error as NSError?
+                          let result: [String: Any] = ["check": "avfoundation-media", "room": source.room, "playable": playable, "ready": item.status == .readyToPlay, "playing": player.timeControlStatus == .playing, "decoded_frame": decodedFrame, "width": Int(item.presentationSize.width), "video_tracks": video.count, "audio_tracks": audio.count, "item_status": item.status.rawValue, "time_status": player.timeControlStatus.rawValue, "failure_domain": failure?.domain ?? "", "failure_code": failure?.code ?? 0]
                           player.pause()
                           let data = try JSONSerialization.data(withJSONObject: result, options: .sortedKeys)
                           print(String(decoding: data, as: UTF8.self))
