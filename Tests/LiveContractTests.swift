@@ -46,6 +46,10 @@ private struct ContractFailure: Error, CustomStringConvertible {
         let search = try LiveAPI.decode(fixture("search-rooms"), as: LiveSearchPayload.self)
         try expect(search.rooms.items.count == 40 && (search.numberOfPages ?? 0) > 1, "Decode real search pagination")
         try expect(search.rooms.items.allSatisfy { $0.isLive && !$0.category.contains("<em") && $0.cover.hasPrefix("https://") }, "Normalize highlighted search labels and protocol-relative images")
+        let emptySearch = try LiveAPI.decode(Data("{\"code\":0,\"data\":{\"result\":[],\"numPages\":1}}".utf8), as: LiveSearchPayload.self)
+        try expect(LiveAPI.searchPage(primary: emptySearch, alternative: search, page: 1).rooms.count == search.rooms.items.count, "An empty signed success can use real compatible search results")
+        try expect(LiveAPI.searchPage(primary: search, alternative: emptySearch, page: 1).rooms.map(\.id) == search.rooms.items.map(\.id), "A nonempty signed result remains authoritative")
+        try expect(LiveAPI.searchPage(primary: emptySearch, page: 1).rooms.isEmpty, "A real empty result is not filled with fabricated recommendations")
 
         var row = try JSONSerialization.jsonObject(with: fixture("recommend-page-1")) as! [String: Any]
         let data = row["data"] as! [String: Any]

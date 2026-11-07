@@ -39,6 +39,13 @@ signing algorithm, canonical RFC-3986 query encoding, and a short in-memory key
 cache. It continues to send no account cookies or login credentials. Service
 challenges are reported instead of automatically circumvented.
 
+A later successful signed request returned an empty list while the compatible
+unsigned endpoint returned the live room for the same keyword. After an empty
+signed success only, the client therefore checks the compatible endpoint once.
+It uses that response only when it contains real live results. A challenge or
+failed signed request is still reported as an error, and genuine empty results
+are never replaced with unrelated recommendations.
+
 The existing H5 playback endpoint was also checked with a room obtained from
 search: HTTP 200, `code: 0`, and two HTTPS stream URLs in `data.durl`.
 

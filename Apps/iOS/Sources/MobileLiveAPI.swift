@@ -390,9 +390,27 @@ enum LiveAPI {
             let payload = try await request("/x/web-interface/wbi/search/type", host: "api.bilibili.com",
                 parameters: signed.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) },
                 as: LiveSearchPayload.self)
-            let more = payload.numberOfPages.map { page < $0 } ?? (payload.rooms.rawCount > 0)
-            return LiveRoomPage(rooms: payload.rooms.items, hasMore: more)
+            var alternative: LiveSearchPayload?
+            if payload.rooms.items.isEmpty {
+                // Both endpoints returned real but inconsistent successful
+                // results during verification. Check the compatible endpoint
+                // only after an empty success, never after a service challenge.
+                do {
+                    alternative = try await request("/x/web-interface/search/type", host: "api.bilibili.com", parameters: [
+                        .init(name: "search_type", value: "live_room"), .init(name: "keyword", value: keyword),
+                        .init(name: "page", value: String(page))
+                    ], as: LiveSearchPayload.self)
+                } catch { try Task.checkCancellation() }
+            }
+            return searchPage(primary: payload, alternative: alternative, page: page)
         }
+    }
+    static func searchPage(primary: LiveSearchPayload, alternative: LiveSearchPayload? = nil, page: Int) -> LiveRoomPage {
+        let selected: LiveSearchPayload
+        if primary.rooms.items.isEmpty, let alternative, !alternative.rooms.items.isEmpty { selected = alternative }
+        else { selected = primary }
+        let more = selected.numberOfPages.map { page < $0 } ?? (selected.rooms.rawCount > 0)
+        return LiveRoomPage(rooms: selected.rooms.items, hasMore: more)
     }
     private static func recommendations(page: Int) async throws -> LiveRoomPage {
         do {
